@@ -26,6 +26,7 @@ git pull
 echo -e "${CYAN}Aktiviere virtuelle Umgebung...${NC}"
 if [ -d ".venv" ]; then
     source .venv/bin/activate
+    pip install -r requirements.txt
 else
     echo -e "${RED}Virtuelle Umgebung nicht gefunden. Erstelle neue Umgebung...${NC}"
     python3 -m venv .venv

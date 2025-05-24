@@ -12,6 +12,7 @@ git pull
 Write-Host "Aktiviere virtuelle Umgebung..." -ForegroundColor Cyan
 if (Test-Path ".venv") {
     .\.venv\Scripts\Activate.ps1
+    pip install -r requirements.txt
     Write-Host "Virtuelle Umgebung erfolgreich aktiviert." -ForegroundColor Green
 } else {
     Write-Host "Virtuelle Umgebung nicht gefunden. Erstelle neue Umgebung..." -ForegroundColor Yellow

@@ -1,1 +1,1 @@
-Tool for [@username] (https://github.com/arotec20).
+Tool for [@username](https://github.com/arotec20).

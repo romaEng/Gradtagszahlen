@@ -49,5 +49,4 @@ else
 fi
 
 # Keep terminal open after execution
-echo -e "${GREEN}Vorgang abgeschlossen. Zum Beenden [ENTER]...${NC}"
-read
+echo -e "${GREEN}Vorgang abgeschlossen.${NC}"

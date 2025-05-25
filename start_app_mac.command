@@ -40,11 +40,12 @@ echo -e "${CYAN}Starte Anwendung...${NC}"
 # Check for python version
 if command -v python3 &> /dev/null; then
     python3 main.py
+    check_error "Python-Skript wurde mit Fehler beendet"
 elif command -v python &> /dev/null; then
     python main.py
+    check_error "Python-Skript wurde mit Fehler beendet"
 else
-    echo -e "${RED}Python wurde nicht gefunden!${NC}"
-    exit 1
+    handle_error "Python wurde nicht gefunden!"
 fi
 
 # Keep terminal open after execution

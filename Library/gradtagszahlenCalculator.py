@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from crudHandler import CrudHandler
+from accessify import protected
 
 @dataclass
 class CityData:
@@ -111,6 +112,7 @@ class GradtagszahlenCalculator:
         self.logger.info(f"Calculation completed for {len(results)}/{len(cities)} cities")
         return results
     
+    @protected
     def _validate_inputs(
         self,
         cities: List[CityData],
@@ -143,6 +145,7 @@ class GradtagszahlenCalculator:
             if not (-180 <= city.longitude <= 180):
                 raise ValueError(f"Invalid longitude for {city.name}: {city.longitude}")
     
+    @protected
     def _fetch_temperature_data(
         self,
         city: CityData,
@@ -190,6 +193,7 @@ class GradtagszahlenCalculator:
         except Exception as e:
             raise Exception(f"Failed to fetch temperature data for {city.name}: {e}")
     
+    @protected
     def _calculate_heating_degree_days(
         self,
         temperatures: List[float],

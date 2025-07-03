@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDateEdit, QDoubleSpinBox,
     QListWidget, QGroupBox, QFormLayout, QSpacerItem, QSizePolicy,
-    QListWidgetItem, QMessageBox, QInputDialog
+    QListWidgetItem, QMessageBox, QInputDialog, QAbstractSpinBox
 )
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtGui import QFont
@@ -23,7 +23,7 @@ class GradtagsberechnungGUI(QMainWindow):
         # Left panel for inputs
         left_panel = self.create_left_panel()
         
-        # Right panel (placeholder for results/map)
+        # Right panel
         right_panel = self.create_right_panel()
         
         # Add panels to main layout
@@ -71,18 +71,22 @@ class GradtagsberechnungGUI(QMainWindow):
         
         # Room temperature
         self.room_temp = QDoubleSpinBox()
-        self.room_temp.setRange(15.0, 25.0)
+        self.room_temp.setRange(-100.0, 100.0)
         self.room_temp.setValue(20.0)
         self.room_temp.setSuffix(" °C")
         self.room_temp.setDecimals(1)
+        self.room_temp.setKeyboardTracking(False) # Disable immediate update on typing
+        self.room_temp.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType) # Adaptive step size
         parameter_layout.addRow("Raumtemperatur:", self.room_temp)
         
         # Heating limit
         self.heating_limit = QDoubleSpinBox()
-        self.heating_limit.setRange(10.0, 20.0)
+        self.heating_limit.setRange(-100.0, 100.0)
         self.heating_limit.setValue(15.0)
         self.heating_limit.setSuffix(" °C")
         self.heating_limit.setDecimals(1)
+        self.heating_limit.setKeyboardTracking(False) # Disable immediate update on typing
+        self.heating_limit.setStepType(QAbstractSpinBox.AdaptiveDecimalStepType)
         parameter_layout.addRow("Heizgrenze:", self.heating_limit)
         
         left_layout.addWidget(parameter_group)
@@ -271,4 +275,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

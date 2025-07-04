@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDateEdit, QDoubleSpinBox,
     QListWidget, QGroupBox, QFormLayout, QSpacerItem, QSizePolicy,
-    QListWidgetItem, QMessageBox, QInputDialog, QAbstractSpinBox)
+    QListWidgetItem, QMessageBox, QInputDialog, QAbstractSpinBox, QDialog)
 from PySide6.QtCore import QDate, Qt, QUrl, QTimer
 from PySide6.QtGui import QFont
 from datetime import datetime, date
@@ -12,7 +12,7 @@ import folium
 import tempfile
 import os
 
-class CityDialog(QWidget):
+class CityDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Stadt hinzufügen")
@@ -311,20 +311,24 @@ class GradtagsberechnungGUI(QMainWindow):
     
     def add_city(self):
         """Add a new city via dialog"""
-        from city_dialog import CityDialog  # Would need separate dialog class
-        # For now, simple input dialog
-        name, ok = QInputDialog.getText(self, "Stadt hinzufügen", "Stadtname:")
-        if ok and name:
-            lat, ok = QInputDialog.getDouble(self, "Koordinaten", "Breitengrad:", 
-                                           decimals=4, min=-90, max=90)
-            if ok:
-                lon, ok = QInputDialog.getDouble(self, "Koordinaten", "Längengrad:", 
-                                               decimals=4, min=-180, max=180)
-                if ok:
-                    item_text = f"{name} ({lat:.4f}, {lon:.4f})"
-                    item = QListWidgetItem(item_text)
-                    item.setData(Qt.UserRole, {'name': name, 'lat': lat, 'lon': lon})
-                    self.city_list.addItem(item)
+        dialog = CityDialog(self)
+        dialog.show()
+        
+        # Wait for dialog to close (non-blocking)
+        def on_dialog_closed():
+            if hasattr(dialog, 'selected_address') and dialog.selected_address:
+                # Extract city name from address (simple approach)
+                city_name = dialog.selected_address.split(',')[0].strip()
+                
+                item_text = f"{city_name} ({dialog.selected_lat:.4f}, {dialog.selected_lon:.4f})"
+                item = QListWidgetItem(item_text)
+                item.setData(Qt.UserRole, {
+                    'name': city_name, 
+                    'lat': dialog.selected_lat, 
+                    'lon': dialog.selected_lon})
+                self.city_list.addItem(item)
+        
+        dialog.destroyed.connect(on_dialog_closed)
     
     def edit_city(self):
         """Edit selected city"""

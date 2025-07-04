@@ -422,7 +422,7 @@ class GradtagsberechnungGUI(QMainWindow):
             self.city_list.addItem(item)
             
             # Show success message
-            QMessageBox.information(self, "Erfolg", f"Stadt '{city_name}' wurde hinzugefügt!")
+            QMessageBox.information(self, "Erfolg", f"Adresse '{dialog.selected_address}' wurde hinzugefügt!")
     
     def edit_city(self):
         """Edit selected city"""

@@ -2,13 +2,20 @@ import sys
 import os
 import tempfile
 import requests
+import pandas as pd
+import plotly.graph_objects as go
+import json
+from datetime import datetime, timedelta
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDateEdit, QDoubleSpinBox,
-    QListWidget, QGroupBox, QFormLayout, QListWidgetItem, QMessageBox, QDialog)
+    QListWidget, QGroupBox, QFormLayout, QListWidgetItem, QMessageBox, QDialog,
+    QScrollArea, QFrame)
 from PyQt5.QtCore import QDate, Qt, QUrl
 from PyQt5.QtGui import QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
+from Library.gradtagszahlenCalculator import GradtagszahlenCalculator, CityData
+from Library.crudHandler import CrudHandler
 
 class CityDialog(QDialog):
     def __init__(self, parent=None):
@@ -222,12 +229,32 @@ class GradtagsberechnungGUI(QMainWindow):
     def create_right_panel(self):
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        placeholder = QLabel("Hier werden Ergebnisse und Karte angezeigt")
-        placeholder.setAlignment(Qt.AlignCenter)
-        placeholder.setStyleSheet("""
-            QLabel {border: 2px dashed #ccc; border-radius: 10px; color: #888; font-size: 16px; padding: 50px;}
-        """)
-        right_layout.addWidget(placeholder)
+
+        # Results section
+        results_group = QGroupBox("Berechnungsergebnisse")
+        results_layout = QVBoxLayout(results_group)
+        
+        # Scrollable results list
+        self.results_list = QListWidget()
+        self.results_list.setMinimumHeight(200)
+        results_layout.addWidget(self.results_list)
+        
+        # Charts section
+        charts_group = QGroupBox("Temperaturverlauf")
+        charts_layout = QVBoxLayout(charts_group)
+        
+        # Scrollable area for charts
+        charts_scroll = QScrollArea()
+        charts_scroll.setWidgetResizable(True)
+        charts_container = QWidget()
+        self.charts_container_layout = QVBoxLayout(charts_container)
+        charts_scroll.setWidget(charts_container)
+        charts_layout.addWidget(charts_scroll)
+        
+        # Add groups to main layout
+        right_layout.addWidget(results_group)
+        right_layout.addWidget(charts_group)
+        
         return right_widget
 
     def add_city(self):
@@ -263,12 +290,156 @@ class GradtagsberechnungGUI(QMainWindow):
         for i in range(self.city_list.count()):
             item = self.city_list.item(i)
             city_data = item.data(Qt.UserRole)
-            cities.append(city_data)
+            cities.append(CityData(
+                name=city_data['name'],
+                latitude=city_data['lat'],
+                longitude=city_data['lon']
+            ))
         if not cities:
             QMessageBox.warning(self, "Warnung", "Bitte mindestens eine Adresse auswählen!")
             return
-        QMessageBox.information(self, "Info", f"Berechnung gestartet für {len(cities)} Adresse(n)\nZeitraum: {start_date} bis {end_date}\nRaumtemperatur: {room_temp}°C, Heizlimit: {heating_limit}°C")
+        self.results_list.clear()
+        for i in reversed(range(self.charts_container_layout.count())):
+            widget = self.charts_container_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        # Initialisiere API-Handler und Calculator
+        crud_handler = CrudHandler("https://archive-api.open-meteo.com/v1")
+        calculator = GradtagszahlenCalculator(crud_handler)
+        try:
+            results = calculator.calculate_for_cities(
+                cities=cities,
+                start_date=start_date,
+                end_date=end_date,
+                room_temperature=room_temp,
+                heating_limit=heating_limit
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Berechnung fehlgeschlagen: {e}")
+            return
+        # Für jede Stadt: Temperaturdaten abfragen und Diagramm erzeugen
+        for city in cities:
+            city_name = city.name
+            result = results.get(city_name)
+            if not result:
+                continue
+            # Temperaturdaten für Plot abfragen
+            try:
+                temps = calculator.get_temperature_data(city, start_date, end_date)
+            except Exception as e:
+                QMessageBox.warning(self, "Warnung", f"Temperaturdaten für {city_name} konnten nicht geladen werden: {e}")
+                continue
+            # Heiztage und Differenzen berechnen
+            daily_hdds = []
+            for temp in temps:
+                if temp < heating_limit:
+                    hdd = room_temp - temp
+                    daily_hdds.append(hdd)
+                else:
+                    daily_hdds.append(0)
+            # Ergebnistext
+            result_text = (f"{city_name}: \n"
+                         f"Gradtagszahl: {result.gradtagszahl:.1f}\n"
+                         f"Durchschnittstemperatur: {sum(temps)/len(temps):.1f}°C\n"
+                         f"Heiztage: {result.heating_days_count}")
+            item = QListWidgetItem(result_text)
+            # Abwechselnd einfärben
+            if self.results_list.count() % 2 == 1:
+                item.setBackground(Qt.lightGray)
+            self.results_list.addItem(item)
+            # Datumsliste erzeugen
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            dates = [(start + timedelta(days=x)).strftime("%Y-%m-%d") for x in range(len(temps))]
+            self.create_temperature_chart(
+                city_name,
+                dates,
+                temps,
+                room_temp,
+                heating_limit,
+                daily_hdds
+            )
         self.export_btn.setEnabled(True)
+
+    def create_temperature_chart(self, city_name, dates, temperatures, room_temp, heating_limit, hdds):
+        chart_container = QWidget()
+        chart_layout = QVBoxLayout(chart_container)
+        chart_layout.setContentsMargins(0, 0, 0, 0)
+        chart_layout.setSpacing(0)
+        web_view = QWebEngineView()
+        web_view.setMinimumHeight(400)
+        web_view.setMaximumHeight(400)
+        fig = go.Figure()
+        # Temperaturkurve als Treppenfunktion (hv), keine Marker
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=temperatures,
+            name='Außentemperatur',
+            line=dict(color='#2196F3', shape='hv'),
+            hovertemplate='%{y:.1f}°C<extra></extra>',
+            mode='lines'
+        ))
+        # Raumtemperatur-Linie
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=[room_temp]*len(dates),
+            name='Raumtemperatur',
+            line=dict(color='#FF9800', dash='dash')
+        ))
+        # Heizgrenze-Linie
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=[heating_limit]*len(dates),
+            name='Heizgrenze',
+            line=dict(color='#F44336', dash='dash')
+        ))
+        # Heizbedarf-Flächen: Für jeden Block von Heiztagen eine eigene Fläche
+        block_start = None
+        for i, temp in enumerate(temperatures + [None]):  # +[None] für Blockende am Schluss
+            if temp is not None and temp < heating_limit:
+                if block_start is None:
+                    block_start = i
+            else:
+                if block_start is not None:
+                    block_end = i
+                    # Block von block_start bis block_end-1
+                    x_block = dates[block_start:block_end] + dates[block_start:block_end][::-1]
+                    y_block = [room_temp]*(block_end-block_start) + temperatures[block_start:block_end][::-1]
+                    fig.add_trace(go.Scatter(
+                        x=x_block,
+                        y=y_block,
+                        fill='toself',
+                        fillcolor='rgba(255, 152, 0, 0.2)',
+                        line=dict(width=0),
+                        name='Heizbedarf' if block_start == 0 else None,
+                        showlegend=(block_start == 0),
+                        hoverinfo='skip',
+                    ))
+                    block_start = None
+        fig.update_layout(
+            title=f'Temperaturverlauf - {city_name}',
+            xaxis_title='Datum',
+            yaxis_title='Temperatur (°C)',
+            hovermode='x unified',
+            height=400,
+            margin=dict(l=50, r=50, t=50, b=50),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+                bgcolor='rgba(255, 255, 255, 0.8)'
+            )
+        )
+        temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html', encoding='utf-8')
+        temp_file.write(fig.to_html(include_plotlyjs='cdn', full_html=True))
+        temp_file.close()
+        web_view.load(QUrl.fromLocalFile(temp_file.name))
+        chart_layout.addWidget(web_view)
+        chart_container.setMinimumHeight(400)
+        chart_container.setMaximumHeight(400)
+        self.charts_container_layout.addWidget(chart_container)
 
     def export_results(self):
         QMessageBox.information(self, "Info", "Export-Funktionalität würde hier implementiert")
@@ -279,6 +450,13 @@ class GradtagsberechnungGUI(QMainWindow):
         self.room_temp.setValue(20.0)
         self.heating_limit.setValue(15.0)
         self.export_btn.setEnabled(False)
+        self.results_list.clear()
+        
+        # Clear all charts
+        for i in reversed(range(self.charts_container_layout.count())):
+            widget = self.charts_container_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
 
 def main():
     app = QApplication(sys.argv)

@@ -11,6 +11,8 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 import folium
 import tempfile
 import os
+import requests
+import json
 
 class CityDialog(QDialog):
     def __init__(self, parent=None):
@@ -23,6 +25,7 @@ class CityDialog(QDialog):
         self.selected_lat = 52.5244  # Default Berlin
         self.selected_lon = 13.4105
         self.selected_address = ""
+        self.setModal(True)
         
         layout = QVBoxLayout(self)
         
@@ -77,68 +80,150 @@ class CityDialog(QDialog):
         
     def create_map(self):
         """Create interactive map with folium"""
-        # Create folium map
-        m = folium.Map(
+        try:
+            # Create folium map
+            m = folium.Map(
                 location=[self.selected_lat, self.selected_lon],
-                zoom_start=10,
+                zoom_start=12,
                 tiles='OpenStreetMap')
-        
-        # Add tile layers for satellite view
-        folium.TileLayer(
-            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            attr='Esri',
-            name='Satellite',
-            overlay=False,
-            control=True).add_to(m)
-        
-        # Add marker
-        folium.Marker(
-            [self.selected_lat, self.selected_lon],
-            popup=f"Lat: {self.selected_lat:.4f}, Lon: {self.selected_lon:.4f}",
-            draggable=True).add_to(m)
-        
-        # Add layer control
-        folium.LayerControl().add_to(m)
-        
-        # Add click event JavaScript
-        click_js = """
-        function onMapClick(e) {
-            // This would need more complex implementation for coordinate updates
-        }
-        """
-        
-        # Save to temporary file
-        temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html')
-        m.save(temp_file.name)
-        temp_file.close()
-        
-        # Load in web view
-        self.map_view.load(QUrl.fromLocalFile(temp_file.name))
+            
+            # Add tile layers for satellite view
+            folium.TileLayer(
+                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attr='Esri',
+                name='Satellit',
+                overlay=False,
+                control=True).add_to(m)
+            
+            # Add CartoDB Positron (clean style)
+            folium.TileLayer(
+                tiles='CartoDB positron',
+                name='Hell',
+                overlay=False,
+                control=True).add_to(m)
+            
+            # Add marker with better popup
+            popup_text = f"""
+            <b>Ausgewählter Standort</b><br>
+            Breitengrad: {self.selected_lat:.6f}<br>
+            Längengrad: {self.selected_lon:.6f}<br>
+            {f'<br>{self.selected_address}' if self.selected_address else ''}
+            """
+            
+            folium.Marker(
+                [self.selected_lat, self.selected_lon],
+                popup=folium.Popup(popup_text, max_width=300),
+                tooltip="Klicken für Details",
+                icon=folium.Icon(color='red', icon='home')).add_to(m)
+            
+            # Add layer control
+            folium.LayerControl().add_to(m)
+            
+            # Save to temporary file
+            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html', encoding='utf-8')
+            m.save(temp_file.name)
+            temp_file.close()
+            
+            # Load in web view
+            self.map_view.load(QUrl.fromLocalFile(temp_file.name))
+            
+        except Exception as e:
+            print(f"Map creation error: {e}")
+            # Fallback: show error in web view
+            error_html = f"""
+            <html><body>
+            <h3>Karte konnte nicht geladen werden</h3>
+            <p>Fehler: {str(e)}</p>
+            <p>Koordinaten: {self.selected_lat:.6f}, {self.selected_lon:.6f}</p>
+            </body></html>
+            """
+            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html', encoding='utf-8')
+            temp_file.write(error_html)
+            temp_file.close()
+            self.map_view.load(QUrl.fromLocalFile(temp_file.name))
         
     def search_address(self):
-        """Search for address and update map"""
+        """Search for address using Nominatim geocoding"""
         address = self.address_input.text().strip()
         if not address:
             QMessageBox.warning(self, "Warnung", "Bitte eine Adresse eingeben!")
             return
-            
-        # Here you would implement geocoding
-        # For now, just show message
-        QMessageBox.information(self, "Info", f"Suche nach: {address}\n(Geocoding wird implementiert)")
         
-        # Mock coordinates (in real implementation, use geocoding service)
-        self.selected_address = address
-        # Update map with new coordinates
-        self.create_map()
+        # Show searching message
+        self.search_btn.setText("Suche...")
+        self.search_btn.setEnabled(False)
+        
+        try:
+            # Use Nominatim (OpenStreetMap) for geocoding
+            url = "https://nominatim.openstreetmap.org/search"
+            params = {
+                'q': address,
+                'format': 'json',
+                'limit': 1,
+                'addressdetails': 1}
+            
+            headers = {
+                'User-Agent': 'Gradtagszahlen-Tool'}
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if data:
+                # Found address
+                result = data[0]
+                self.selected_lat = float(result['lat'])
+                self.selected_lon = float(result['lon'])
+                self.selected_address = result.get('display_name', address)
+                
+                # Update map
+                self.create_map()
+                
+                QMessageBox.information(self, "Gefunden!", 
+                    f"Adresse gefunden:\n{self.selected_address}\n\n"
+                    f"Koordinaten:\n"
+                    f"Lat: {self.selected_lat:.6f}\n"
+                    f"Lon: {self.selected_lon:.6f}")
+            else:
+                QMessageBox.warning(self, "Nicht gefunden", 
+                    f"Keine Ergebnisse für '{address}' gefunden.\n"
+                    "Bitte überprüfen Sie die Schreibweise.")
+                
+        except requests.exceptions.Timeout:
+            QMessageBox.critical(self, "Fehler", 
+                "Zeitüberschreitung bei der Suche. Bitte erneut versuchen.")
+        except requests.exceptions.ConnectionError:
+            QMessageBox.critical(self, "Fehler", 
+                "Keine Internetverbindung. Bitte Verbindung prüfen.")
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Suchfehler: {str(e)}")
+        
+        finally:
+            # Reset button
+            self.search_btn.setText("Suchen")
+            self.search_btn.setEnabled(True)
         
     def accept_city(self):
         """Accept the selected city"""
-        if not self.address_input.text().strip():
-            QMessageBox.warning(self, "Warnung", "Bitte eine Adresse eingeben!")
+        if not self.selected_address and not self.address_input.text().strip():
+            QMessageBox.warning(self, "Warnung", "Bitte eine Adresse eingeben und suchen!")
             return
-            
-        self.selected_address = self.address_input.text().strip()
-        self.close()
+        
+        # Use searched address or manual input
+        if not self.selected_address:
+            self.selected_address = self.address_input.text().strip()
+        
+        # Confirm the selection
+        reply = QMessageBox.question(self, "Stadt hinzufügen", 
+            f"Stadt hinzufügen?\n\n"
+            f"Adresse: {self.selected_address}\n"
+            f"Koordinaten: {self.selected_lat:.6f}, {self.selected_lon:.6f}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes)
+        
+        if reply == QMessageBox.Yes:
+            self.accept()  # Close dialog with success
 
 class GradtagsberechnungGUI(QMainWindow):
     def __init__(self):
@@ -312,23 +397,31 @@ class GradtagsberechnungGUI(QMainWindow):
     def add_city(self):
         """Add a new city via dialog"""
         dialog = CityDialog(self)
-        dialog.show()
         
-        # Wait for dialog to close (non-blocking)
-        def on_dialog_closed():
-            if hasattr(dialog, 'selected_address') and dialog.selected_address:
-                # Extract city name from address (simple approach)
-                city_name = dialog.selected_address.split(',')[0].strip()
-                
-                item_text = f"{city_name} ({dialog.selected_lat:.4f}, {dialog.selected_lon:.4f})"
-                item = QListWidgetItem(item_text)
-                item.setData(Qt.UserRole, {
-                    'name': city_name, 
-                    'lat': dialog.selected_lat, 
-                    'lon': dialog.selected_lon})
-                self.city_list.addItem(item)
-        
-        dialog.destroyed.connect(on_dialog_closed)
+        if dialog.exec() == QDialog.Accepted:
+            # Extract city name from address (get first part before comma)
+            address_parts = dialog.selected_address.split(',')
+            city_name = address_parts[0].strip()
+            
+            # If still too long, take first two parts
+            if len(city_name) > 30 and len(address_parts) > 1:
+                city_name = f"{address_parts[0].strip()}, {address_parts[1].strip()}"
+            
+            # Create list item
+            item_text = f"{city_name} ({dialog.selected_lat:.4f}, {dialog.selected_lon:.4f})"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.UserRole, {
+                'name': city_name,
+                'lat': dialog.selected_lat,
+                'lon': dialog.selected_lon,
+                'full_address': dialog.selected_address
+            })
+            
+            # Add to list
+            self.city_list.addItem(item)
+            
+            # Show success message
+            QMessageBox.information(self, "Erfolg", f"Stadt '{city_name}' wurde hinzugefügt!")
     
     def edit_city(self):
         """Edit selected city"""

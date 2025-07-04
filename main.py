@@ -5,8 +5,7 @@ import requests
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDateEdit, QDoubleSpinBox,
-    QListWidget, QGroupBox, QFormLayout, QListWidgetItem, QMessageBox, QDialog
-)
+    QListWidget, QGroupBox, QFormLayout, QListWidgetItem, QMessageBox, QDialog)
 from PyQt5.QtCore import QDate, Qt, QUrl
 from PyQt5.QtGui import QFont
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -195,9 +194,6 @@ class GradtagsberechnungGUI(QMainWindow):
         self.add_city_btn = QPushButton("Stadt hinzufügen")
         self.add_city_btn.clicked.connect(self.add_city)
         city_buttons_layout.addWidget(self.add_city_btn)
-        self.edit_city_btn = QPushButton("Bearbeiten")
-        self.edit_city_btn.clicked.connect(self.edit_city)
-        city_buttons_layout.addWidget(self.edit_city_btn)
         self.remove_city_btn = QPushButton("Entfernen")
         self.remove_city_btn.clicked.connect(self.remove_city)
         city_buttons_layout.addWidget(self.remove_city_btn)
@@ -252,12 +248,6 @@ class GradtagsberechnungGUI(QMainWindow):
             })
             self.city_list.addItem(item)
             QMessageBox.information(self, "Erfolg", f"Adresse '{dialog.selected_address}' wurde hinzugefügt!")
-
-    def edit_city(self):
-        current = self.city_list.currentItem()
-        if current:
-            data = current.data(Qt.UserRole)
-            QMessageBox.information(self, "Info", f"Bearbeitung von {data['name']} würde hier implementiert")
 
     def remove_city(self):
         current_row = self.city_list.currentRow()

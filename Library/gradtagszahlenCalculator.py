@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
-from crudHandler import CrudHandler
+from Library.crudHandler import CrudHandler
 from accessify import protected
 
 @dataclass
@@ -261,6 +261,13 @@ class GradtagszahlenCalculator:
             )
             
         return "\n".join(summary_lines)
+    
+    def get_temperature_data(self, city: CityData, start_date: str, end_date: str) -> list:
+        """
+        Public method to fetch daily mean temperature data for a city and period.
+        Returns a list of daily mean temperatures in Celsius.
+        """
+        return self._fetch_temperature_data(city, start_date, end_date)
 
 
 # Example usage and testing

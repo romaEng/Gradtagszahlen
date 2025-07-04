@@ -13,7 +13,7 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 class CityDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Stadt hinzufügen")
+        self.setWindowTitle("Adresse hinzufügen")
         self.setGeometry(200, 200, 800, 600)
         self.setModal(True)
         self.selected_lat = 52.5244
@@ -128,7 +128,7 @@ class CityDialog(QDialog):
             return
         if not self.selected_address:
             self.selected_address = self.address_input.text().strip()
-        reply = QMessageBox.question(self, "Stadt hinzufügen", f"Stadt hinzufügen?\n\nAdresse: {self.selected_address}\nKoordinaten: {self.selected_lat:.6f}, {self.selected_lon:.6f}", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        reply = QMessageBox.question(self, "Adresse hinzufügen", f"Adresse hinzufügen?\n\nAdresse: {self.selected_address}\nKoordinaten: {self.selected_lat:.6f}, {self.selected_lon:.6f}", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if reply == QMessageBox.Yes:
             self.accept()
 
@@ -184,14 +184,14 @@ class GradtagsberechnungGUI(QMainWindow):
         self.heating_limit.setDecimals(1)
         parameter_layout.addRow("Heizgrenze:", self.heating_limit)
         left_layout.addWidget(parameter_group)
-        cities_group = QGroupBox("Städte für Berechnung")
+        cities_group = QGroupBox("Adressen für Berechnung")
         cities_layout = QVBoxLayout(cities_group)
         self.city_list = QListWidget()
         self.city_list.setMinimumHeight(300)
         self.city_list.setMaximumHeight(300)
         cities_layout.addWidget(self.city_list)
         city_buttons_layout = QHBoxLayout()
-        self.add_city_btn = QPushButton("Stadt hinzufügen")
+        self.add_city_btn = QPushButton("Adresse hinzufügen")
         self.add_city_btn.clicked.connect(self.add_city)
         city_buttons_layout.addWidget(self.add_city_btn)
         self.remove_city_btn = QPushButton("Entfernen")
@@ -265,9 +265,9 @@ class GradtagsberechnungGUI(QMainWindow):
             city_data = item.data(Qt.UserRole)
             cities.append(city_data)
         if not cities:
-            QMessageBox.warning(self, "Warnung", "Bitte mindestens eine Stadt auswählen!")
+            QMessageBox.warning(self, "Warnung", "Bitte mindestens eine Adresse auswählen!")
             return
-        QMessageBox.information(self, "Info", f"Berechnung gestartet für {len(cities)} Städte\nZeitraum: {start_date} bis {end_date}\nParameter: {room_temp}°C / {heating_limit}°C")
+        QMessageBox.information(self, "Info", f"Berechnung gestartet für {len(cities)} Adresse(n)\nZeitraum: {start_date} bis {end_date}\nRaumtemperatur: {room_temp}°C, Heizlimit: {heating_limit}°C")
         self.export_btn.setEnabled(True)
 
     def export_results(self):

@@ -3,11 +3,14 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDateEdit, QDoubleSpinBox,
     QListWidget, QGroupBox, QFormLayout, QSpacerItem, QSizePolicy,
-    QListWidgetItem, QMessageBox, QInputDialog, QAbstractSpinBox
-)
-from PySide6.QtCore import QDate, Qt
+    QListWidgetItem, QMessageBox, QInputDialog, QAbstractSpinBox)
+from PySide6.QtCore import QDate, Qt, QUrl, QTimer
 from PySide6.QtGui import QFont
 from datetime import datetime, date
+from PySide6.QtWebEngineWidgets import QWebEngineView
+import folium
+import tempfile
+import os
 
 class GradtagsberechnungGUI(QMainWindow):
     def __init__(self):
@@ -98,8 +101,6 @@ class GradtagsberechnungGUI(QMainWindow):
         # City list
         self.city_list = QListWidget()
         self.city_list.setMaximumHeight(150)
-        # Add some default cities
-        self.add_default_cities()
         cities_layout.addWidget(self.city_list)
         
         # City management buttons
@@ -179,22 +180,6 @@ class GradtagsberechnungGUI(QMainWindow):
         
         right_layout.addWidget(placeholder)
         return right_widget
-    
-    def add_default_cities(self):
-        """Add some default German cities"""
-        default_cities = [
-            ("Berlin", 52.5244, 13.4105),
-            ("München", 48.1351, 11.5820),
-            ("Hamburg", 53.5511, 9.9937),
-            ("Köln", 50.9375, 6.9603),
-            ("Frankfurt", 50.1109, 8.6821)
-        ]
-        
-        for name, lat, lon in default_cities:
-            item_text = f"{name} ({lat:.4f}, {lon:.4f})"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, {'name': name, 'lat': lat, 'lon': lon})
-            self.city_list.addItem(item)
     
     def add_city(self):
         """Add a new city via dialog"""

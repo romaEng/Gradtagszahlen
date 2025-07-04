@@ -12,6 +12,134 @@ import folium
 import tempfile
 import os
 
+class CityDialog(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Stadt hinzufügen")
+        self.setGeometry(200, 200, 800, 600)
+        self.setWindowModality(Qt.ApplicationModal)
+        
+        # Store coordinates
+        self.selected_lat = 52.5244  # Default Berlin
+        self.selected_lon = 13.4105
+        self.selected_address = ""
+        
+        layout = QVBoxLayout(self)
+        
+        # Address input section
+        address_group = QGroupBox("Adresseingabe")
+        address_layout = QFormLayout(address_group)
+        
+        self.address_input = QLineEdit()
+        self.address_input.setPlaceholderText("z.B. Berlin, Deutschland oder Musterstraße 1, PLZ Musterstadt")
+        address_layout.addRow("Adresse:", self.address_input)
+        
+        self.search_btn = QPushButton("Suchen")
+        self.search_btn.clicked.connect(self.search_address)
+        address_layout.addRow("", self.search_btn)
+        
+        layout.addWidget(address_group)
+        
+        # Map section
+        map_group = QGroupBox("Kartenansicht")
+        map_layout = QVBoxLayout(map_group)
+        
+        self.map_view = QWebEngineView()
+        self.create_map()
+        map_layout.addWidget(self.map_view)
+        
+        layout.addWidget(map_group)
+        
+        # Buttons section
+        button_layout = QHBoxLayout()
+        
+        self.add_btn = QPushButton("Hinzufügen")
+        self.add_btn.clicked.connect(self.accept_city)
+        self.add_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 4px;
+            }
+        """)
+        
+        self.cancel_btn = QPushButton("Abbrechen")
+        self.cancel_btn.clicked.connect(self.close)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(self.cancel_btn)
+        button_layout.addWidget(self.add_btn)
+        
+        layout.addLayout(button_layout)
+        
+    def create_map(self):
+        """Create interactive map with folium"""
+        # Create folium map
+        m = folium.Map(
+                location=[self.selected_lat, self.selected_lon],
+                zoom_start=10,
+                tiles='OpenStreetMap')
+        
+        # Add tile layers for satellite view
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Satellite',
+            overlay=False,
+            control=True).add_to(m)
+        
+        # Add marker
+        folium.Marker(
+            [self.selected_lat, self.selected_lon],
+            popup=f"Lat: {self.selected_lat:.4f}, Lon: {self.selected_lon:.4f}",
+            draggable=True).add_to(m)
+        
+        # Add layer control
+        folium.LayerControl().add_to(m)
+        
+        # Add click event JavaScript
+        click_js = """
+        function onMapClick(e) {
+            // This would need more complex implementation for coordinate updates
+        }
+        """
+        
+        # Save to temporary file
+        temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.html')
+        m.save(temp_file.name)
+        temp_file.close()
+        
+        # Load in web view
+        self.map_view.load(QUrl.fromLocalFile(temp_file.name))
+        
+    def search_address(self):
+        """Search for address and update map"""
+        address = self.address_input.text().strip()
+        if not address:
+            QMessageBox.warning(self, "Warnung", "Bitte eine Adresse eingeben!")
+            return
+            
+        # Here you would implement geocoding
+        # For now, just show message
+        QMessageBox.information(self, "Info", f"Suche nach: {address}\n(Geocoding wird implementiert)")
+        
+        # Mock coordinates (in real implementation, use geocoding service)
+        self.selected_address = address
+        # Update map with new coordinates
+        self.create_map()
+        
+    def accept_city(self):
+        """Accept the selected city"""
+        if not self.address_input.text().strip():
+            QMessageBox.warning(self, "Warnung", "Bitte eine Adresse eingeben!")
+            return
+            
+        self.selected_address = self.address_input.text().strip()
+        self.close()
+
 class GradtagsberechnungGUI(QMainWindow):
     def __init__(self):
         super().__init__()

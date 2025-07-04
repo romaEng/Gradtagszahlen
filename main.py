@@ -408,8 +408,9 @@ class GradtagsberechnungGUI(QMainWindow):
                 city_name = f"{address_parts[0].strip()}, {address_parts[1].strip()}"
             
             # Create list item
-            item_text = f"{city_name} ({dialog.selected_lat:.4f}, {dialog.selected_lon:.4f})"
+            item_text = f"{dialog.selected_address} ({dialog.selected_lat:.4f}, {dialog.selected_lon:.4f})"
             item = QListWidgetItem(item_text)
+            item.setToolTip(dialog.selected_address)
             item.setData(Qt.UserRole, {
                 'name': city_name,
                 'lat': dialog.selected_lat,
